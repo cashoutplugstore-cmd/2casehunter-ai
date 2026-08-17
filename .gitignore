@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+.next/
+out/
+
+# Generated media
+storage/temp/
+storage/audio/
+storage/images/
+storage/videos/
+storage/thumbnails/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
