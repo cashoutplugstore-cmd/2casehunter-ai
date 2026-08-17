@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+httpx
+openai
+supabase
+redis
+celery
+feedparser
