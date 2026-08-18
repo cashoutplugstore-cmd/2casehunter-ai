@@ -1,0 +1,16 @@
+build:
+  command: "npm run build"
+  system: auto
+
+working_directory: apps/web
+build_context_directory: /
+
+pre_build_command: "npm install"
+post_build_command: ""
+
+start_command: "npm run start -- --hostname 0.0.0.0 --port $PORT"
+
+health_check:
+  type: http
+  interval_in_seconds: 60
+  http_path: /
