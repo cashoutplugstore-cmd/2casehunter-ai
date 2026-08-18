@@ -1,0 +1,28 @@
+build:
+  command: "npm run build"
+  system: auto
+  min_cpu: 0.1
+  max_cpu: 0.5
+  min_memory: 512
+  max_memory: 1024
+working_directory: apps/web
+build_context_directory: /
+pre_build_command: "npm ci"
+post_build_command: ""
+start_command: "npm run start -- --hostname 0.0.0.0 --port $PORT"
+scaling:
+  min_cpu: 0.01
+  max_cpu: 0.1
+  min_memory: 128
+  max_memory: 256
+  min_replicas: 1
+  max_replicas: 1
+health_check:
+  type: http
+  interval_in_seconds: 60
+  http_path: /
+cron_jobs: []
+workers: []
+review_apps:
+  enabled: false
+  ttl_days: 7
