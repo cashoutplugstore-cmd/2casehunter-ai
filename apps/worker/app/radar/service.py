@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .rss import RadarItem, fetch_rss
+from .rss import fetch_rss
 from .scoring import score_story
+from .sources import get_active_sources
 
 
 def scan_feed(url: str, source_name: str = "RSS") -> list[dict]:
@@ -19,3 +20,21 @@ def scan_feed(url: str, source_name: str = "RSS") -> list[dict]:
         )
 
     return sorted(results, key=lambda item: item["score"], reverse=True)
+
+
+def scan_active_sources() -> list[dict]:
+    results: list[dict] = []
+    for source in get_active_sources():
+        try:
+            results.extend(scan_feed(source["url"], source["name"]))
+        except Exception as exc:
+            results.append(
+                {
+                    "source_id": source["id"],
+                    "source_name": source["name"],
+                    "url": source["url"],
+                    "error": str(exc),
+                }
+            )
+
+    return sorted(results, key=lambda item: item.get("score", -1), reverse=True)
