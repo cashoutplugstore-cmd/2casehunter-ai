@@ -1,7 +1,7 @@
 fastapi
-uvicorn[standard]
-pydantic
-pydantic-settings
+uvicorn
+pydantic==2.9.2
+pydantic-settings==2.5.2
 httpx
 openai
 supabase
