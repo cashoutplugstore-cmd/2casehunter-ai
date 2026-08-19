@@ -22,8 +22,8 @@ def _clean(value: Any) -> str:
 def build_blueprint(story: dict[str, Any], target: str = "arabic-short-form") -> dict[str, Any]:
     """Prepare a reviewable content blueprint from a discovered story.
 
-    This is the CaseHunter/GenLab-style preparation stage only: it does not
-    publish automatically or copy copyrighted source material.
+    Keep enough source context for the free translation stage to produce a
+    coherent Arabic short script instead of translating a sentence fragment.
     """
     title = _clean(story.get("title"))
     summary = _clean(story.get("summary"))
@@ -31,7 +31,9 @@ def build_blueprint(story: dict[str, Any], target: str = "arabic-short-form") ->
         raise ValueError("story.title is required")
 
     hook = f"شنو القصة؟ {title}"
-    angle = summary[:280] if summary else "شرح مختصر للخبر مع التركيز على أهم معلومة قابلة للتحقق."
+    # Give the translation provider enough context, while keeping the local
+    # pipeline bounded for short-form generation.
+    angle = summary[:1400] if summary else "شرح مختصر للخبر مع التركيز على أهم معلومة قابلة للتحقق."
 
     blueprint = ContentBlueprint(
         title=title,
