@@ -27,6 +27,45 @@ def _shorten(text: str, limit: int = 520) -> str:
     return chunk.rsplit(" ", 1)[0].strip() + "…"
 
 
+def _split_for_translation(text: str, max_chars: int = 450) -> list[str]:
+    """Split source text into safe MyMemory-sized chunks, preferring sentences."""
+    text = _clean_text(text)
+    if not text:
+        return []
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks: list[str] = []
+    current = ""
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        if len(sentence) > max_chars:
+            words = sentence.split()
+            piece = ""
+            for word in words:
+                candidate = f"{piece} {word}".strip()
+                if len(candidate) > max_chars and piece:
+                    chunks.append(piece)
+                    piece = word
+                else:
+                    piece = candidate
+            if piece:
+                if current:
+                    chunks.append(current)
+                    current = ""
+                chunks.append(piece)
+            continue
+        candidate = f"{current} {sentence}".strip()
+        if len(candidate) > max_chars and current:
+            chunks.append(current)
+            current = sentence
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def _fallback_script(title: str, hook: str, angle: str) -> str:
     """No-cost fallback. Never pretends to translate an English story."""
     if angle and any(ord(ch) > 127 for ch in angle):
@@ -47,18 +86,12 @@ def _fallback_script(title: str, hook: str, angle: str) -> str:
     )
 
 
-def _mymemory_translate(text: str, limit: int = 4500) -> str | None:
-    """Free public translation fallback; no API key required."""
-    text = _clean_text(text)
-    if not text:
-        return None
-
+def _translate_chunk(client: httpx.Client, text: str) -> str | None:
     try:
-        response = httpx.get(
+        response = client.get(
             "https://api.mymemory.translated.net/get",
-            params={"q": text[:limit], "langpair": "en|ar"},
+            params={"q": text, "langpair": "en|ar"},
             timeout=12.0,
-            follow_redirects=True,
         )
         response.raise_for_status()
         data = response.json()
@@ -68,8 +101,29 @@ def _mymemory_translate(text: str, limit: int = 4500) -> str | None:
             if translated and translated.lower() != text.lower():
                 return translated
     except Exception:
-        pass
+        return None
     return None
+
+
+def _mymemory_translate(text: str, limit: int = 450) -> str | None:
+    """Free public translation fallback; split requests under the 500-char limit."""
+    chunks = _split_for_translation(_clean_text(text), max_chars=min(limit, 450))
+    if not chunks:
+        return None
+
+    translated_chunks: list[str] = []
+    try:
+        with httpx.Client(follow_redirects=True) as client:
+            for chunk in chunks:
+                translated = _translate_chunk(client, chunk)
+                if not translated:
+                    return None
+                translated_chunks.append(translated)
+    except Exception:
+        return None
+
+    result = _clean_text(" ".join(translated_chunks))
+    return result or None
 
 
 def _openai_script(title: str, summary: str) -> str | None:
@@ -113,7 +167,7 @@ def build_short_script(blueprint: dict[str, Any]) -> dict[str, Any]:
     if not ai_script:
         translated = _mymemory_translate(angle)
         if title and not any(ord(ch) > 127 for ch in title):
-            translated_title = _mymemory_translate(title, limit=500)
+            translated_title = _mymemory_translate(title)
 
     if ai_script:
         script = ai_script
@@ -121,7 +175,6 @@ def build_short_script(blueprint: dict[str, Any]) -> dict[str, Any]:
         provider = "openai"
     elif translated:
         output_title = translated_title or title
-        # Keep the hook natural in Arabic even when the source title is English.
         output_hook = f"شنو القصة؟ {output_title}"
         script = "\n\n".join(
             part for part in (
