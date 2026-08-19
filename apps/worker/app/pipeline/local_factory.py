@@ -19,7 +19,8 @@ def run_local_factory(story: dict[str, Any], metrics: dict[str, Any] | None = No
     if policy["status"] != "approved_for_generation":
         return {"status": "blocked", "stage": "safety", "policy": policy}
 
-    blueprint = build_blueprint(story, target="arabic-short-form")
+    blueprint_result = build_blueprint(story, target="arabic-short-form")
+    blueprint = blueprint_result.get("blueprint", blueprint_result)
     experiment = build_experiment(blueprint)
     script = build_short_script(blueprint)
     production = build_production_plan(script)
