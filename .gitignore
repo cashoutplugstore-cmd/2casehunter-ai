@@ -22,3 +22,6 @@ storage/thumbnails/
 .vscode/
 .idea/
 .DS_Store
+
+# Local generated render output
+tmp/
