@@ -14,13 +14,26 @@ def _clean_text(value: str) -> str:
     return value
 
 
+def _shorten(text: str, limit: int = 520) -> str:
+    """Keep a useful short-form chunk and prefer a sentence boundary."""
+    text = _clean_text(text)
+    if len(text) <= limit:
+        return text
+    chunk = text[:limit]
+    boundaries = [chunk.rfind("."), chunk.rfind("؟"), chunk.rfind("!"), chunk.rfind(".")]
+    boundary = max(boundaries)
+    if boundary >= int(limit * 0.55):
+        return chunk[: boundary + 1].strip()
+    return chunk.rsplit(" ", 1)[0].strip() + "…"
+
+
 def _fallback_script(title: str, hook: str, angle: str) -> str:
     """No-cost fallback. Never pretends to translate an English story."""
     if angle and any(ord(ch) > 127 for ch in angle):
         return "\n\n".join(
             part for part in (
                 hook or f"خلينا نفهم شنو صار بـ{title}.",
-                angle,
+                _shorten(angle),
                 "شنو رأيك؟ تابعنا للمزيد من القصص والتحليلات.",
             ) if part
         )
@@ -34,7 +47,7 @@ def _fallback_script(title: str, hook: str, angle: str) -> str:
     )
 
 
-def _mymemory_translate(text: str) -> str | None:
+def _mymemory_translate(text: str, limit: int = 4500) -> str | None:
     """Free public translation fallback; no API key required."""
     text = _clean_text(text)
     if not text:
@@ -43,7 +56,7 @@ def _mymemory_translate(text: str) -> str | None:
     try:
         response = httpx.get(
             "https://api.mymemory.translated.net/get",
-            params={"q": text[:4500], "langpair": "en|ar"},
+            params={"q": text[:limit], "langpair": "en|ar"},
             timeout=12.0,
             follow_redirects=True,
         )
@@ -96,27 +109,35 @@ def build_short_script(blueprint: dict[str, Any]) -> dict[str, Any]:
 
     ai_script = _openai_script(title, angle)
     translated = None
+    translated_title = None
     if not ai_script:
         translated = _mymemory_translate(angle)
+        if title and not any(ord(ch) > 127 for ch in title):
+            translated_title = _mymemory_translate(title, limit=500)
 
     if ai_script:
         script = ai_script
+        output_title = title
         provider = "openai"
     elif translated:
+        output_title = translated_title or title
+        # Keep the hook natural in Arabic even when the source title is English.
+        output_hook = f"شنو القصة؟ {output_title}"
         script = "\n\n".join(
             part for part in (
-                hook or f"خلينا نفهم شنو صار بـ{title}.",
-                translated,
+                output_hook,
+                _shorten(translated),
                 "شنو رأيك؟ تابعنا للمزيد من القصص والتحليلات.",
             ) if part
         )
         provider = "mymemory-free"
     else:
-        script = _fallback_script(title, hook, angle)
+        output_title = title
+        script = _fallback_script(output_title, hook, angle)
         provider = "fallback"
 
     return {
-        "title": title,
+        "title": output_title,
         "format": "short",
         "language": "ar",
         "script": script,
