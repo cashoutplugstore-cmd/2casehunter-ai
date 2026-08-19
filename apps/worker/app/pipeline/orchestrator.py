@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .experiment import build_experiment
+from .feedback import feedback_signal
 from .policy import review_policy
 from .production import build_production_plan
 from .providers import submit_render_job
@@ -18,20 +19,15 @@ def run_content_factory(
     target: str = "arabic-short-form",
     platform: str = "tiktok",
 ) -> dict[str, Any]:
-    """Run the complete safe content workflow without calling paid providers."""
-    pipeline = run_feed_pipeline(feed_url, source_name=source_name, target=target)
+    """Run the complete local content workflow without paid provider calls."""
+    pipeline = run_feed_pipeline(feed_url, source_name=source_name, target=target, persist=False)
     if pipeline.get("status") != "ready_for_review":
         return {"status": pipeline.get("status", "no_story"), "stage": "discovery", "pipeline": pipeline}
 
     story = pipeline["story"]
     policy = review_policy(story)
     if policy["status"] != "approved_for_generation":
-        return {
-            "status": "blocked",
-            "stage": "safety",
-            "pipeline": pipeline,
-            "policy": policy,
-        }
+        return {"status": "blocked", "stage": "safety", "pipeline": pipeline, "policy": policy}
 
     blueprint = pipeline["blueprint"]
     experiment = build_experiment(blueprint)
@@ -56,4 +52,5 @@ def run_content_factory(
         "render": render_job,
         "render_submission": render_submission,
         "publish": publish_job,
+        "feedback": feedback_signal({}),
     }
