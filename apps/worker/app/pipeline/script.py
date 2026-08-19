@@ -27,8 +27,8 @@ def _shorten(text: str, limit: int = 520) -> str:
     return chunk.rsplit(" ", 1)[0].strip() + "…"
 
 
-def _split_for_translation(text: str, max_chars: int = 450) -> list[str]:
-    """Split source text into safe MyMemory-sized chunks, preferring sentences."""
+def _split_for_translation(text: str, max_chars: int = 300) -> list[str]:
+    """Split source text into conservative MyMemory-sized chunks."""
     text = _clean_text(text)
     if not text:
         return []
@@ -95,19 +95,25 @@ def _translate_chunk(client: httpx.Client, text: str) -> str | None:
         )
         response.raise_for_status()
         data = response.json()
+        if data.get("responseStatus") not in (None, 200):
+            return None
         translated = data.get("responseData", {}).get("translatedText")
-        if translated and isinstance(translated, str):
-            translated = _clean_text(translated)
-            if translated and translated.lower() != text.lower():
-                return translated
+        if not translated or not isinstance(translated, str):
+            return None
+        translated = _clean_text(translated)
+        lowered = translated.lower()
+        if not translated or lowered == text.lower():
+            return None
+        if "query length limit exceeded" in lowered or "max allowed query" in lowered:
+            return None
+        return translated
     except Exception:
         return None
-    return None
 
 
-def _mymemory_translate(text: str, limit: int = 450) -> str | None:
-    """Free public translation fallback; split requests under the 500-char limit."""
-    chunks = _split_for_translation(_clean_text(text), max_chars=min(limit, 450))
+def _mymemory_translate(text: str, limit: int = 300) -> str | None:
+    """Free public translation fallback using conservative request sizes."""
+    chunks = _split_for_translation(_clean_text(text), max_chars=min(limit, 300))
     if not chunks:
         return None
 
