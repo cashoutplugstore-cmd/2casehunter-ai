@@ -10,9 +10,10 @@ from .pipeline.render import build_render_job
 from .pipeline.runner import run_feed_pipeline
 from .pipeline.script import build_short_script
 from .pipeline.service import build_blueprint
+from .pipeline.orchestrator import run_content_factory
 from .radar.service import scan_feed
 
-app = FastAPI(title="CaseHunter AI Worker", version="1.0.0")
+app = FastAPI(title="CaseHunter AI Worker", version="1.1.0")
 
 
 class RadarScanRequest(BaseModel):
@@ -24,6 +25,13 @@ class PipelineRunRequest(BaseModel):
     feed_url: HttpUrl
     source_name: str = "RSS"
     target: str = "arabic-short-form"
+
+
+class FactoryRequest(BaseModel):
+    feed_url: HttpUrl
+    source_name: str = "RSS"
+    target: str = "arabic-short-form"
+    platform: str = "tiktok"
 
 
 class BlueprintRequest(BaseModel):
@@ -61,8 +69,8 @@ def home() -> str:
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CaseHunter AI</title>
 <style>body{margin:0;background:#0b1020;color:#eef2ff;font-family:system-ui,-apple-system,sans-serif}main{max-width:1000px;margin:auto;padding:40px 20px}header{margin-bottom:28px}h1{font-size:36px;margin:0 0 8px}p{color:#aab4d0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}.card{background:#151c31;border:1px solid #29324d;border-radius:16px;padding:22px}.card b{display:block;font-size:18px;margin-bottom:8px}.status{color:#66e3a4}code{background:#0f1528;padding:3px 7px;border-radius:6px}</style></head>
 <body><main><header><h1>CaseHunter AI</h1><p>منصة اكتشاف وتحليل وتجهيز ونشر المحتوى بالذكاء الاصطناعي</p></header>
-<div class="grid"><div class="card"><b>🔎 اكتشاف</b><span>Radar للأخبار والمصادر</span></div><div class="card"><b>📊 تحليل</b><span>تقييم القصص والمصادر</span></div><div class="card"><b>🎯 استهداف</b><span>تحديد الجمهور والصيغة</span></div><div class="card"><b>📝 تجهيز</b><span>Content Blueprint</span></div><div class="card"><b>✍️ سكربت</b><span>مسودة Short أصلية</span></div><div class="card"><b>🎬 إنتاج</b><span>خطة مشاهد وصوت وترجمة</span></div><div class="card"><b>🧩 Render</b><span>Render job + provider adapter</span></div><div class="card"><b>🚀 نشر</b><span>Publish queue جاهز</span></div><div class="card"><b>📈 Analytics</b><span>جاهز لتتبع النتائج</span></div><div class="card"><b>● API</b><span class="status">Online</span></div></div>
-<p style="margin-top:28px">Health: <code>/health</code> · Pipeline: <code>/pipeline/run</code> · Render: <code>/pipeline/render</code> · Publish: <code>/pipeline/publish</code></p>
+<div class="grid"><div class="card"><b>🔎 اكتشاف</b><span>Radar للأخبار والمصادر</span></div><div class="card"><b>🛡️ Safety</b><span>فحص قبل التوليد</span></div><div class="card"><b>📊 تحليل</b><span>تقييم القصص والمصادر</span></div><div class="card"><b>🎯 استهداف</b><span>تحديد الجمهور والصيغة</span></div><div class="card"><b>📝 تجهيز</b><span>Content Blueprint</span></div><div class="card"><b>✍️ سكربت</b><span>مسودة Short أصلية</span></div><div class="card"><b>🎬 إنتاج</b><span>خطة مشاهد وصوت وترجمة</span></div><div class="card"><b>🧩 Render</b><span>Render job + provider adapter</span></div><div class="card"><b>🚀 نشر</b><span>Publish queue جاهز</span></div><div class="card"><b>📈 Analytics</b><span>تتبع وتحسين النتائج</span></div><div class="card"><b>🧪 Experiments</b><span>اختبار Hooks وAngles</span></div><div class="card"><b>● API</b><span class="status">Online</span></div></div>
+<p style="margin-top:28px">Health: <code>/health</code> · Factory: <code>/factory/run</code></p>
 </main></body></html>"""
 
 
@@ -86,6 +94,21 @@ def pipeline_run(request: PipelineRunRequest) -> dict:
         return run_feed_pipeline(str(request.feed_url), source_name=request.source_name, target=request.target)
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Pipeline could not process the RSS feed") from exc
+
+
+@app.post("/factory/run")
+def factory_run(request: FactoryRequest) -> dict:
+    try:
+        return run_content_factory(
+            str(request.feed_url),
+            source_name=request.source_name,
+            target=request.target,
+            platform=request.platform,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Content factory could not complete the workflow") from exc
 
 
 @app.post("/pipeline/blueprint")
