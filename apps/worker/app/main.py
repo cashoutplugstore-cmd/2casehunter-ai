@@ -4,10 +4,11 @@ from pydantic import BaseModel, HttpUrl
 
 from .db import get_supabase
 from .pipeline.runner import run_feed_pipeline
+from .pipeline.script import build_short_script
 from .pipeline.service import build_blueprint
 from .radar.service import scan_feed
 
-app = FastAPI(title="CaseHunter AI Worker", version="0.5.0")
+app = FastAPI(title="CaseHunter AI Worker", version="0.6.0")
 
 
 class RadarScanRequest(BaseModel):
@@ -27,6 +28,10 @@ class BlueprintRequest(BaseModel):
     source_url: HttpUrl | None = None
     score: float | None = None
     target: str = "arabic-short-form"
+
+
+class ScriptRequest(BaseModel):
+    blueprint: dict
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -53,12 +58,13 @@ code{background:#0f1528;padding:3px 7px;border-radius:6px}
 <div class="card"><b>📊 تحليل</b><span>تقييم القصص والمصادر</span></div>
 <div class="card"><b>🎯 استهداف</b><span>تحديد الجمهور والصيغة</span></div>
 <div class="card"><b>📝 تجهيز</b><span>Content Blueprint</span></div>
+<div class="card"><b>✍️ سكربت</b><span>مسودة Short أصلية</span></div>
 <div class="card"><b>🎬 إنتاج</b><span>جاهز لإضافة مولد الفيديو</span></div>
 <div class="card"><b>🚀 نشر</b><span>جاهز لربط منصات النشر</span></div>
 <div class="card"><b>📈 Analytics</b><span>جاهز لتتبع النتائج</span></div>
 <div class="card"><b>● API</b><span class="status">Online</span></div>
 </div>
-<p style="margin-top:28px">Health: <code>/health</code> · Radar: <code>/radar/scan</code> · Pipeline: <code>/pipeline/run</code> · Blueprint: <code>/pipeline/blueprint</code></p>
+<p style="margin-top:28px">Health: <code>/health</code> · Radar: <code>/radar/scan</code> · Pipeline: <code>/pipeline/run</code> · Script: <code>/pipeline/script</code></p>
 </main></body></html>"""
 
 
@@ -93,6 +99,14 @@ def pipeline_run(request: PipelineRunRequest) -> dict:
 def pipeline_blueprint(request: BlueprintRequest) -> dict:
     try:
         return build_blueprint(request.model_dump(), target=request.target)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/pipeline/script")
+def pipeline_script(request: ScriptRequest) -> dict:
+    try:
+        return build_short_script(request.blueprint)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
