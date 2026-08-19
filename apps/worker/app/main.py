@@ -3,15 +3,22 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, HttpUrl
 
 from .db import get_supabase
+from .pipeline.runner import run_feed_pipeline
 from .pipeline.service import build_blueprint
 from .radar.service import scan_feed
 
-app = FastAPI(title="CaseHunter AI Worker", version="0.4.1")
+app = FastAPI(title="CaseHunter AI Worker", version="0.5.0")
 
 
 class RadarScanRequest(BaseModel):
     feed_url: HttpUrl
     source_name: str = "RSS"
+
+
+class PipelineRunRequest(BaseModel):
+    feed_url: HttpUrl
+    source_name: str = "RSS"
+    target: str = "arabic-short-form"
 
 
 class BlueprintRequest(BaseModel):
@@ -51,7 +58,7 @@ code{background:#0f1528;padding:3px 7px;border-radius:6px}
 <div class="card"><b>📈 Analytics</b><span>جاهز لتتبع النتائج</span></div>
 <div class="card"><b>● API</b><span class="status">Online</span></div>
 </div>
-<p style="margin-top:28px">Health: <code>/health</code> · Radar: <code>/radar/scan</code> · Blueprint: <code>/pipeline/blueprint</code></p>
+<p style="margin-top:28px">Health: <code>/health</code> · Radar: <code>/radar/scan</code> · Pipeline: <code>/pipeline/run</code> · Blueprint: <code>/pipeline/blueprint</code></p>
 </main></body></html>"""
 
 
@@ -68,6 +75,18 @@ def radar_scan(request: RadarScanRequest) -> dict:
         raise HTTPException(status_code=502, detail="RSS feed could not be read") from exc
 
     return {"count": len(items), "items": items}
+
+
+@app.post("/pipeline/run")
+def pipeline_run(request: PipelineRunRequest) -> dict:
+    try:
+        return run_feed_pipeline(
+            str(request.feed_url),
+            source_name=request.source_name,
+            target=request.target,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Pipeline could not process the RSS feed") from exc
 
 
 @app.post("/pipeline/blueprint")
